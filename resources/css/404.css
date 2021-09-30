@@ -1,0 +1,51 @@
+body{
+	margin : 0;
+	background-color : #FFF1E5;
+}
+
+#fof_container{
+	width : 50%;
+	margin : 2em auto;
+	text-align : center;
+}
+
+#not_found_message{
+	color : #BD1515;
+	padding : 0.5em;
+	font-weight : bold;
+}
+
+#option_sel {
+	font-style : italic;
+}
+
+ul{
+	list-style-type : none;
+	padding : 0;
+	margin : 0.5em;
+}
+
+li{
+	padding : 0.2em;
+}
+
+li:hover{
+	background-color : #994C4C;
+}
+
+a{
+	font-weight : bold;
+	color : black;
+	padding-bottom : 0.1em;
+	text-decoration : none;
+	display : block;
+}
+
+li:hover a{
+	color : white;
+}
+
+.fof{
+	color : #BD1515;
+	font-size : 5em;
+}
