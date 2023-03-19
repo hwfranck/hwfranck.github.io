@@ -101,6 +101,16 @@ main p, #footnotes {
 	text-align : justify;
 }
 
+.article-list {
+	list-style : none;
+	padding-left : 0;
+}
+
+.article-list .pubdate {
+	font-style : normal;
+	margin-right : 1em;
+}
+
 .code_block {
 	background-color : #FFE6D5;
 	border-color :	#5D5854;
