@@ -3,6 +3,11 @@ body {
 	background-color : #FFF1E5;
 }
 
+main {
+	margin : 0 auto;
+	width : 94%;
+}
+
 /*	----	HEADER	----	*/
 
 .logo_container{
@@ -46,10 +51,94 @@ nav ul a:hover{
 
 /*	----	CONTENT	----	*/
 
-a{
+h1 {
 	color : #BD1515;
+}
+
+
+h2 a {
+	color : #F06305;
 	text-decoration : none;
+}
+
+h2 a:hover {
+	color : #BD4E04;
+}
+
+h2 a::before {
+	content : "#";
+	margin-right : 0.25em;
+}
+
+img {
+	block-size : auto;
+	max-inline-size : 100%;
+	vertical-align : middle;
+}
+
+figcaption {
+	font-size : 0.9em;
+	font-style : italic;
+}
+
+figure {
+	text-align : center;
+}
+
+pre {
+	tab-size : 4;
+}
+
+dt {
 	font-weight : bold;
+}
+
+dd {
+	margin-left : 1em;
+}
+
+main p, #footnotes {
+	text-align : justify;
+}
+
+.code_block {
+	background-color : #FFE6D5;
+	border-color :	#5D5854;
+	border-style : solid;
+	border-width : 2px;
+	color : #95525F;
+	margin : 0 auto;
+	max-inline-size : 30em;
+}
+
+.code_caption {
+	background-color: #965460;
+	color : #ECE2CF;
+	font-style : italic;
+}
+
+.code_content {
+	font-weight : bold;
+	padding-left : 1em;
+}
+
+.code_inline {
+	background-color : #FFE6D5;
+	color : #95525F;
+	font-weight : bold;
+	padding : 0 0.3em;
+}
+
+.pubdate {
+	font-size : 0.9em;
+	font-style : italic;
+}
+
+@media all and (min-width : 70em) {
+	main {
+		width : 65em;
+		margin : 0 auto;
+	}
 }
 
 /*	----	ABOUT	----	*/

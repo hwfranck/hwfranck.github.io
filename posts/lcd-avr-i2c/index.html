@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en-us">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/resources/images/apple-touch-icon.png">
+		<link rel="icon" type="image/png" sizes="196x196" href="/resources/images/favicon.png">
+		<link rel="stylesheet" href="/resources/css/index.css">
+		<meta name="description" content="Learn how to control an LCD module using an atmel/microchip microcontroller in plain C without using external libraries.">
+		<title>Control an LCD module over I2C (TWI) with an avr</title>
+	</head>
+	<body>
+		<header>
+			<nav>
+				<div class="logo_container"> <a href="/"> <img src="/resources/images/logo_white.png" alt="" class="logo"> </a> </div>
+				<ul>
+					<li> <a href="/blog/"> Blog </a> </li>
+					<li> <a href="/about/"> About </a> </li>
+				</ul>
+			</nav>
+		</header>
+		<main>
+			<h1>Control an LCD module over I<sup>2</sup>C (TWI) with an avr</h1>
+			<span class="pubdate">Published: 2023-Mar-19</span>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/lcd_battery_graphics.jpg" alt="A 16x2 LCD module displaying some text and graphics" width="464">
+				<figcaption>The final result</figcaption>
+			</figure>
+
+			<h2 id="intro"><a href="#intro">Introduction</a></h2>
+
+			<p>
+			This article shows how to connect an <a href="https://www.microchip.com/en-us/product/ATMEGA2560">atmega 2560</a>-based board to an LCD module over I<sup>2</sup>C (Inter-Integrated Circuit).
+			No I<sup>2</sup>C/LCD library will be used, the goal being to further the understanding of a beginner.
+			The TWI (Two-Wire Serial Interface) used in the Atmel (now Microchip) documentation is basically the same as I<sup>2</sup>C. Those two terms will be used interchangeably here.
+			The I<sup>2</sup>C is interesting here because it allows us to perform the desired task using only 2 pins of the microcontroller (MCU) instead of 8. The downside is that we need a new I/O expander board to bridge the gap between the 2 pins of the MCU and the 8 pins of the LCD module and we'll have a slightly longer code. The full source code is available on <a href="https://github.com/hwfranck/lcd-avr-i2c">github</a>. The main steps are: configure the TWI module, initialize the LCD and write a few functions to display some text or graphics or both.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/pcf8574_board.jpg" alt="An annotated image of the port expander on the back of the LCD module" width="400">
+				<img src="/resources/images/lcd-avr-i2c/pcf8574_schematic.jpg" alt="The schematic of a PCF8574-based board" width="400">
+				<figcaption>LCD with the expander on the back and the schematic from <a href="https://image.dfrobot.com/image/data/DFR0063/DFR0063_v1.2_Schematic.pdf">dfrobot.com</a> <a id="note_expander_origin" href="#note_expander"> <sup>[1]</sup> </a></figcaption>
+			</figure>
+
+			<p>
+			The left picture above shows the 8-bit I/O expander board soldered onto the LCD. The Jumper BL allows the backlight to work. The final control is achieved through software (<code class="code_inline">BT_DATA</code>).
+			Any atmega 2560-based board will work (as long as you can obtain the datasheet), because all the code will use the default atmel libraries. I'm using an <a href="https://www.elegoo.com/products/elegoo-mega-2560-r3-board">Arduino mega 2560</a>. Most Arduino clones probably have the same pinout <a id="note_arduino_origin" href="#note_arduino"><sup>[2]</sup></a> as the parent Arduino, but double check just to make sure and adjust the pins accordingly. Because the expander board already includes pull-up resistors on the SDA and SCL (clock) lines, we will neither be using additional resistors nor activating internal pull-ups on the MCU board. The circuit is powered through the USB port.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/lcd_arduino.jpg" alt="An arduino connected to the LCD module" width="400">
+				<figcaption>Picture of the circuit</figcaption>
+			</figure>
+
+			<h2 id="i2c"><a href="#i2c">I<sup>2</sup>C configuration</a></h2>
+
+			<p>
+			The expander directs the incoming data frame from SDA to the pins {P<sub>0</sub>...P<sub>7</sub>}. In our case the pins {P<sub>0</sub>...P<sub>7</sub>} are connected to RS, RW, E, BT and {D<sub>4</sub>...D<sub>7</sub>} respectively. This will be important when formatting the data to be sent through the data bus.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/pcf8574_address.jpg" alt="The address format of the PCF8574" width="400">
+				<img src="/resources/images/lcd-avr-i2c/pcf8574a_address.jpg" alt="The address format of the PCF8574A" width="400">
+				<figcaption>Address format of the PCF8574 (and PCF8574A). Pages 5-6</figcaption>
+			</figure>
+
+			<p>
+			To communicate with the expander, we first send its address over the I<sup>2</sup>C bus, followed by a bit indicating whether we want to read from the bus or write. We then send a series of commands or display data or both. Once the final piece of data for the session has been transmitted, we release the communication bus. All these operations will be performed with a bus frequency of 100 kHz.
+			The address of the expander depends on the particular chip that's on the board (PCF8574 or PCF8574A) and the position of the jumpers on the back. The schematic shows the presence of pull-ups resistors on the pins A0-A2. So the address is <code class="code_inline">0b01001110 = 0x27</code>. Any connected jumper would have changed the corresponding bit to 1.
+			</p>
+
+			<p>
+			The clock frequency is set by writing to the TWBR. The following formula shows how to calculate the right value for the desired SCL frequency. By default, TWPS0=TWPS1=0 and the CPU frequency is at 16MHz. So the resulting TWBR value is 72.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/twbr_formula.jpg" alt="The formula to calculate TWBR" width="240">
+				<figcaption>TWBR formula.</figcaption>
+			</figure>
+
+			<p>
+			We will not be reading any data from the LCD module, so we can append the write bit (=0) to the address when initializing the device. The resulting writing address is <code class="code_inline">0x4E</code>.
+			</p>
+
+			<p>
+			The error handling consists of retrying several times, if necessary, before moving on. There are very few things that can go wrong in a simple project like this, so we won't go overboard. <strong>Warning: Do not use this code, as is, in production &#x1F605;</strong>
+			</p>
+
+			<p>
+			Once the I<sup>2</sup>C has been initialized, sending bytes is pretty straightforward: load the data into the TWI Data Register (TWDR), set the correct bits in the TWI Control Register (TWCR), clear the TWINT bit (i.e. write 1) to execute the operation defined in TWCR, wait for the TWINT bit to be set by the hardware and repeat. The TWSR provides status information that could be useful to check if everything is behaving as expected. The bits of interest to us in TWCR are TWINT, TWEN, TWSTA and TWSTO.
+			</p>
+
+			<dl>
+				<dt>TWEN (TWI Enable):</dt>
+				<dd>This is set to ensure the TWI module remains enabled.</dd>
+
+				<dt>TWSTA (TWI Start):</dt>
+				<dd>Writing this bit to 1 makes the TWI try to take control of the serial bus. If successful, the start condition is sent by the hardware module.</dd>
+
+				<dt>TWSTO (TWI Stop):</dt>
+				<dd>Generate the stop condition and release control of the bus.</dd>
+
+				<dt>TWINT (TWI Interrupt):</dt>
+				<dd>This bit has to be cleared (written to 1) in software (i.e. by our code) to start the execution of the operation defined by the other bits of TWCR. The I<sup>2</sup>C hardware (the I<sup>2</sup>C part of the avr) sets this bit to 1 once the operation is completed. This bit is not set after sending the stop condition, so we can skip checking it when stopping the transmission.</dd>
+			</dl>
+
+			<h2 id="lcd"><a href="#lcd">LCD Configuration</a></h2>
+
+			<p>
+			All the information needed to use the LCD module can be found in its <a href="https://www.sparkfun.com/datasheets/LCD/HD44780.pdf">datasheet</a>. The Screenshots below reference the page number from this datasheet. Two important parts to understand are the initialization by instruction and the timing diagram.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/hd44780_4bit_init.jpg" alt="4bit initialization flowchart" width="400">
+				<figcaption>Initialization by instruction. Page 46.</figcaption>
+			</figure>
+
+			<p>
+			The module is in 8-bit mode by default. But given that the expander doesn't connect the data pins {D<sub>0</sub>...D<sub>3</sub>}, we'll switch to 4-bit mode. In this mode, 1 byte is sent by starting with the high-order half-byte (nibble) before sending the low-order nibble in a second operation. This is achieved in code by using <a href="https://en.wikipedia.org/wiki/Mask_(computing)">masking</a> and <a href="https://en.wikipedia.org/wiki/Bitwise_operation#Bit_shifts">shifting</a>. We choose to wait a little more than the minimum delay between operations.
+			</p>
+
+			<p>
+			<code class="code_inline">lcd_init()</code> performs the operations illustrated in the figure above.
+			<code class="code_inline">send_over_twi()</code> is responsible for initiating and completing bus transmissions.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/hd44780_timing_write.jpg" alt="The timing diagram (write) of the HD44780" width="540">
+				<figcaption>Timing diagram for writing. Page 58.</figcaption>
+			</figure>
+			<p>
+			Here's how we'll implement the diagram <a id="note_delay_origin" href="#note_delay"><sup>[3]</sup></a>:
+			<ol>
+				<li>Load the data bus, along with the signals BT, RW and RS.</li>
+				<li>Pull the Enable line high and keep it that way for around 1us (> t<sub>Er</sub>). We then wait 50us after the line is down to give the controller enough time to execute the command.</li>
+			</ol>
+
+			<p>
+			RS is used to select which register of the LCD controller will receive the data. RS=0 when sending an instruction to the controller and RS=1 when sending (display) data. BT is constantly held high to keep the LCD backlight on.
+			</p>
+			<p>
+			<code class="code_inline">lcd_enable()</code> is responsible for handling the EN-signal. It is called every time the data bus ({D<sub>0</sub>...D<sub>7</sub>}) is loaded and only toggles the EN-bit in accordance with the timing diagram.
+			</p>
+
+			<p>
+			One example command we'll use is <code class="code_inline">FUNCTION_SET_4B_2L</code>, which will instruct the LCD to switch into 4-bit mode and display 2 lines. When 2 lines are requested, the display cannot fit 2 lines of 5x10 dot character font, so the only font available in this configuration is 5x8 dot.
+			</p>
+
+			<h2 id="entrypoint"><a href="#entrypoint">Pulling everything together</a></h2>
+
+			<p>
+			All the work has been done in <code class="code_inline">i2c.c</code> and <code class="code_inline">lcd.c</code> and comes together in <code class="code_inline">main.c</code>. After some basic module initializations, <code class="code_inline">lcd_print()</code> writes the desired text to the display.
+			</p>
+
+			<div class="code_block">
+				<div class="code_caption">
+					<strong>./main.c </strong>
+				</div>
+<pre class="code_content">
+<code>#include "i2c.h"
+#include "lcd.h"
+
+int main (void) {
+
+	i2c_init();
+	lcd_init();
+
+	lcd_print("HELLO, WORLD!");
+
+	while (1) {
+		// This can be empty
+	}
+
+	return 0;
+}
+</code></pre>
+			</div>
+
+			<p>
+			The data currently being displayed (a 32 character window) and the data to be displayed (the remaining 48) are copied into the Display Data Ram (DDRAM). When configured in 2 lines mode, the automatic line wrap will not occur at the 17th, but rather at the 41st character mark. It also automatically wraps around to the first position after the 80th character. <code class="code_inline">lcd_print()</code> can easily be extended to move the cursor as it's about to enter the 16-40 range.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/hd44780_charset.png" alt="The character set table of the HD44780" width="400">
+				<figcaption>The character Set of the HD44780. Page 17.</figcaption>
+			</figure>
+
+			<p>
+			The code sent to the controller, to display a character is obtained by combining the nibbles read from the column and row of the desired character from the picture above. According to this, the code for the letter s is <code class="code_inline">0x73</code> while <code class="code_inline">0x37</code> corresponds to the digit 7.
+			</p>
+
+			<p>
+			Calling <code class="code_inline">lcd_print()</code> with special arguments, such as <code class="code_inline">"ßüÜöÖäÄ"</code>, doesn't display the expected characters. The reason is because those special characters in the argument are each encoded in two bytes and the controller will output two (probably different) characters. The encoding is <a href="https://en.wikipedia.org/wiki/UTF-8">UTF-8</a>, but the controller will decode it byte by byte using the character set table of the controller. The first byte maps to the Japanese character &#x30C6; and the second one is a space character. The same process applied to the remaining bytes leads to the bottom part of the picture below.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/hd44780_eszett_ue.jpg" alt="How a string gets turned into characters" width="450">
+				<figcaption>The transformation of special characters</figcaption>
+			</figure>
+
+			<p>
+			One easy way of actually displaying those characters (assuming no <a href="https://en.wikipedia.org/wiki/Kana">Kana</a> are desired), is in checking the next byte every time <code class="code_inline">0xC3</code> is detected before sending the appropriate character code.
+			</p>
+
+			<h2 id="custom"><a href="#custom">Custom Characters</a></h2>
+
+			<p>
+			Custom characters can be displayed by creating the corresponding patterns at the addresses that map to the first column of the character set table. There's enough space for 8 different patterns with a 5x8 dot font and 4 with a 5x10 dot font at a time. We'll only work on the 5x8 grid. The process is the same for the 5x10 grid. The picture below shows all the elements necessary to create 2 patterns.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/hd44780_custom_patterns.jpg" alt="How to read and write custom patterns" width="480">
+				<figcaption>The memory layout for custom patterns. Page 19.</figcaption>
+			</figure>
+
+
+			<p>
+			The stars (*) used in the table indicate, the bit can either be 0 or 1, the result is the same. One consequence is that multiple numbers can represent the same code. For instance, the last cell in the first column equals <code class="code_inline">0b00000001 = 0x01 = 0b00010001 = 0x11</code>.
+			</p>
+
+			<p>
+			The pattern has to be designed on the grid shown in the rightmost column (CGRAM data). A black dot is represented by a 1, and a space by a 0. So that first row of the R pattern can be represented as <code class="code_inline">0b00011110 = 0x1E</code>. To save that line, we need to write that value at the address shown directly to left, in the middle column (CGRAM Address). This process is repeated for all the lines of the pattern. Once done, the character code in the leftmost column will output the saved pattern.
+			</p>
+
+			<p>
+			Writing to a specific CGRAM address begins by sending the address byte to the controller as a command. The data corresponding to the pattern is then sent byte-wise to the controller. The address byte is of the form <code class="code_inline">0b01AAAAAA</code>. Any one of the write operations to the CGRAM increments the address counter. So we just need to send the address of the first line. The starting address is calculated every time a pattern is saved. The address of the first pattern is <code class="code_inline">0b01000000 = 0x40</code>, and increases by 8 for every subsequent pattern.
+			</p>
+
+			<p>
+			Because the address counter is automatically incremented each time we write into the CGRAM, the display cursor may need to be repositioned. The last step is to send the character code corresponding to the pattern we want to appear on screen to the controller. The on-screen characters are automatically updated if the CGRAM is edited.
+			</p>
+
+			<h2 id="conclusion"><a href="#conclusion">One Last Picture</a></h2>
+
+			<p>
+			I'd like to think the code is pretty readable, so I haven't included snippets here. <a href="https://www.twitter.com/hwfranck">Let me know</a> if you think otherwise. Only the basic configurations have been made here, but the code could easily be extended.
+			</p>
+
+			<figure>
+				<img src="/resources/images/lcd-avr-i2c/lcd_daftpunk_hbfs.jpg" alt="Lyrics from Daft Punk" width="464">
+				<figcaption>Who doesn't like Daft Punk ?</figcaption>
+			</figure>
+
+			<p>
+			I hope you enjoyed this article. Thanks for reading.
+			</p>
+
+			<h2 id="notes"><a href="#notes">Notes</a></h2>
+
+			<ol id="footnotes">
+				<li>
+					<span><a id="note_expander" href="#note_expander_origin">&#x21a9;</a></span>
+					<span>The schematic was confirmed using the continuity function of a multimeter. My board isn't from dfrobot, but this schematic seems to be standard.</span>
+				</li>
+
+				<li>
+					<span><a id="note_arduino" href="#note_arduino_origin">&#x21a9;</a></span>
+					<span>The pinout is useful to easily identify how the pins of the atmega are exposed on the board.</span>
+				</li>
+
+				<li>
+					<span><a id="note_delay" href="#note_delay_origin">&#x21a9;</a></span>
+					<span>Those delays are not strictly necessary in this code, because of the overhead of the I<sup>2</sup>C transmission. At 100 kHz, it takes around 80us to transmit 1 Byte through the bus.</span>
+				</li>
+			</ol>
+
+			<h2 id="refs"><a href="#refs">References</a></h2>
+
+			<ol>
+				<li> 8-bit I/O expander module -
+					<a href="https://image.dfrobot.com/image/data/DFR0063/DFR0063_v1.2_Schematic.pdf">Schematic</a> and
+					<a href="https://www.nxp.com/docs/en/data-sheet/PCF8574_PCF8574A.pdf">PCF8574 datasheet</a>
+				</li>
+				<li> Arduino Mega 2560 Rev3 <a href="https://docs.Arduino.cc/hardware/mega-2560">datasheet</a> (In the resources section) </li>
+				<li> ATmega 2560 - <a href="https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/ATmega640-1280-1281-2560-2561-Datasheet-DS40002211A.pdf">Datasheet</a> - <em>24. 2-wire Serial Interface</em></li>
+				<li> LCD Controller - <a href="https://www.sparkfun.com/datasheets/LCD/HD44780.pdf">HD44780U datasheet</a> </li>
+				<li> <a href="https://en.wikipedia.org/wiki/UTF-8">UTF-8</a></li>
+			</ol>
+		</main>
+	</body>
+</html>
