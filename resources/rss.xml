@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/">
+<channel>
+	<title>hwfranck</title>
+	<atom:link href="https://www.hwfranck.com/resources/rss.xml" rel="self" type="application/rss+xml"/>
+	<link>https://www.hwfranck.com</link>
+	<description>A blog about science, technology and more.</description>
+	<language>en-us</language>
+	<lastBuildDate>Mon, 27 Mar 2023 13:32:00 GMT</lastBuildDate>
+	<docs>https://www.rssboard.org/rss-2-0-11</docs>
+	<sy:updatePeriod>weekly</sy:updatePeriod>
+    <sy:updateFrequency>1</sy:updateFrequency>
+    <sy:updateBase>2023-03-19T10:00+01:00</sy:updateBase>
+	<image>
+		<url>https://www.hwfranck.com/resources/images/logo_white.png</url>
+		<title>hwfranck</title>
+		<link>https://www.hwfranck.com</link>
+		<width>136</width>
+		<height>136</height>
+	</image>
+	<item>
+		<title>Control an LCD module over I2C (TWI) with an avr</title>
+		<link>https://www.hwfranck.com/posts/lcd-avr-i2c</link>
+		<description>Learn how to control an LCD module using an atmel/microchip microcontroller in plain C without using external libraries.</description>
+		<pubDate>Sun, 19 Mar 2023 12:58:00 GMT</pubDate>
+		<guid>https://www.hwfranck.com/posts/lcd-avr-i2c</guid>
+	</item>
+</channel>
+</rss>
