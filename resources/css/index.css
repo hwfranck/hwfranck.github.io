@@ -49,6 +49,11 @@ nav ul a:hover{
 	border-bottom : 0.15em solid #660A0A;
 }
 
+.current_page {
+	color : #660A0A;
+	border-bottom : 0.15em solid #660A0A;
+}
+
 /*	----	CONTENT	----	*/
 
 h1 {
