@@ -54,6 +54,12 @@ nav ul a:hover{
 	border-bottom : 0.15em solid #660A0A;
 }
 
+/*	----	HOMEPAGE	----	*/
+
+.home-heading {
+	color : #BD1515;
+}
+
 /*	----	CONTENT	----	*/
 
 h1 {
